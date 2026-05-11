@@ -1,0 +1,26 @@
+﻿# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Логи
+logs/
+
+# Данные (игнорируем всё, кроме .gitkeep)
+data/*
+!data/.gitkeep
+data/xml_data/*
+!data/xml_data/.gitkeep
+data/xml_snapshots/*
+!data/xml_snapshots/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Временные файлы
+generate_readme.py

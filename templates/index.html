@@ -1,0 +1,382 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>WBS Viewer + EVM — Веб-сервер</title>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{
+            font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
+            background:#0f1923;
+            color:#c9d1d9;
+            padding:20px;
+            overflow-x:auto;  /* горизонтальная прокрутка всей страницы */
+        }
+        .app-container{
+            min-width:100%;
+            display:inline-block;
+        }
+        h1{text-align:center;color:#58a6ff;margin-bottom:5px;font-size:24px}
+        .subtitle{text-align:center;color:#8b949e;margin-bottom:20px;font-size:13px}
+        .controls{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+        .controls input[type="text"]{flex:1;min-width:200px;padding:10px 14px;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:14px}
+        .controls select,.controls input[type="date"],.controls input[type="month"]{padding:8px 12px;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:13px}
+        .btn{padding:9px 16px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;transition:.2s}
+        .btn-primary{background:#238636;color:#fff}
+        .btn-primary:hover{background:#2ea043}
+        .btn-secondary{background:#30363d;color:#c9d1d9}
+        .btn-excel{background:#1f6f28;color:#fff}
+        .filters-row{display:flex;gap:12px;margin-bottom:10px;flex-wrap:wrap;align-items:center}
+        .filter-group{display:flex;align-items:center;gap:6px}
+        .filter-group label{font-size:12px;color:#8b949e}
+        .filter-group input[type="range"]{width:120px;accent-color:#58a6ff}
+        .level-value{font-size:13px;color:#58a6ff;font-weight:600;min-width:24px;text-align:center}
+        .multiselect-wrap{position:relative;display:inline-block}
+        .multiselect-btn{padding:8px 12px;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:13px;cursor:pointer;min-width:160px;text-align:left}
+        .multiselect-dropdown{display:none;position:absolute;top:100%;left:0;background:#161b22;border:1px solid #30363d;border-radius:6px;max-height:300px;overflow-y:auto;z-index:100;min-width:240px;padding:6px 0;margin-top:2px}
+        .multiselect-dropdown.open{display:block}
+        .multiselect-dropdown label{display:flex;align-items:center;padding:5px 12px;cursor:pointer;font-size:12px;gap:6px}
+        .ms-controls{display:flex;gap:8px;padding:4px 12px 6px;border-bottom:1px solid #30363d}
+        .ms-controls span{font-size:11px;color:#58a6ff;cursor:pointer}
+        .status-filter{display:flex;gap:4px}
+        .status-chip{padding:6px 14px;border-radius:16px;font-size:12px;font-weight:600;cursor:pointer;border:2px solid transparent}
+        .status-chip.active{border-color:#58a6ff}
+        .chip-notstarted{background:#21262d;color:#8b949e}
+        .chip-inprogress{background:#1c2333;color:#58a6ff}
+        .chip-done{background:#1a2e1a;color:#56d364}
+        .chip-all{background:#161b22;color:#8b949e}
+        .stats{display:flex;gap:15px;margin-bottom:20px;flex-wrap:wrap}
+        .stat-card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:14px 20px;min-width:130px}
+        .stat-card .label{font-size:11px;color:#8b949e;text-transform:uppercase}
+        .stat-card .value{font-size:24px;font-weight:700;color:#58a6ff;margin-top:4px}
+        .stat-card .value.green{color:#56d364}
+        .stat-card .value.yellow{color:#d29922}
+        .project-section{margin-bottom:25px}
+        .project-header{background:#161b22;border:1px solid #30363d;border-radius:8px 8px 0 0;padding:14px 18px;cursor:pointer;display:flex;justify-content:space-between}
+        .project-header:hover{background:#1c2331}
+        .project-header h2{font-size:16px;color:#58a6ff}
+        .project-header .badge{background:#30363d;padding:3px 10px;border-radius:12px;font-size:12px}
+        .project-body{
+            border:1px solid #30363d;
+            border-top:none;
+            border-radius:0 0 8px 8px;
+            overflow-x:visible;  /* убираем внутреннюю прокрутку */
+        }
+        /* Таблица — без фиксации столбцов, прокручивается вся */
+        table{
+            width:100%;
+            border-collapse:collapse;
+            font-size:12px;
+            /* без min-width — таблица подстраивается под содержимое */
+        }
+        th, td{
+            padding:8px 12px;
+            border-bottom:1px solid #21262d;
+            vertical-align:top;
+            white-space:nowrap;   /* текст не переносится, чтобы была горизонтальная прокрутка */
+        }
+        th{
+            background:#161b22;
+            font-weight:600;
+            color:#8b949e;
+            border-bottom:2px solid #30363d;
+            position:sticky;
+            top:0;
+            z-index:10;
+        }
+        /* Разрешаем перенос для длинных названий, чтобы не разрывать таблицу */
+        td:nth-child(2){
+            white-space:normal;
+            word-break:break-word;
+            max-width:300px;
+        }
+        td:nth-child(15), td:nth-child(16), td:nth-child(17){
+            white-space:normal;
+            word-break:break-word;
+            max-width:250px;
+        }
+        tr:hover td{
+            background:#161b22;
+        }
+        .summary-row td{font-weight:600;color:#e6edf3}
+        .milestone-row td{color:#f0883e;font-style:italic}
+        .indent{display:inline-block}
+        .toggle-btn{cursor:pointer;display:inline-block;width:18px;text-align:center;color:#58a6ff;margin-right:4px}
+        .resource-tag{display:inline-block;background:#1f2d3d;padding:2px 8px;border-radius:10px;font-size:11px;margin:1px 2px;color:#79c0ff;white-space:nowrap}
+        .dept-tag{display:inline-block;background:#2d1f3d;padding:2px 8px;border-radius:10px;font-size:11px;margin:1px 2px;color:#d2a8ff;white-space:nowrap}
+        .status-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+        .status-done{background:#1a2e1a;color:#56d364}
+        .status-inprogress{background:#1c2333;color:#58a6ff}
+        .status-notstarted{background:#21262d;color:#8b949e}
+        .evm-pos{color:#56d364;font-weight:600}
+        .evm-neg{color:#f85149}
+        .evm-zero{color:#8b949e}
+        .hidden{display:none}
+        textarea{background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-family:inherit;font-size:11px;padding:4px;width:100%;resize:vertical}
+        textarea:focus{border-color:#58a6ff}
+        .loading{text-align:center;padding:50px;font-size:18px;color:#58a6ff}
+        .error{text-align:center;padding:50px;color:#f85149;background:#2d1a1a;border-radius:8px}
+        .nav{display:flex;gap:20px;justify-content:center;margin-bottom:18px;padding:10px;background:#161b22;border-radius:8px;border:1px solid #30363d}
+        .nav a{font-weight:600;font-size:14px;padding:6px 16px;border-radius:6px;color:#58a6ff;text-decoration:none}
+        .nav a:hover{background:#1c2331}
+        .nav a.active{background:#1f6feb;color:#fff}
+        .critical-badge{color:#f85149;font-weight:bold}
+        .milestone-badge{color:#d29922}
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <div class="nav">
+        <a href="/" class="active">📊 WBS Viewer</a>
+        <a href="/analytics">📈 Аналитика «Было / Стало»</a>
+    </div>
+    <div id="app">
+        <h1>📊 WBS Viewer + EVM</h1>
+        <p class="subtitle" id="subtitle">Загрузка данных...</p>
+        <div class="stats" id="stats-container"></div>
+        <div class="controls">
+            <input type="text" id="si" placeholder="🔍 Поиск по названию, WBS, ресурсам, отделу, заметкам…" oninput="applyAllFilters()">
+            <select id="ff" onchange="applyAllFilters()"><option value="">Все файлы</option></select>
+            <button class="btn btn-primary" onclick="expandAll()">Развернуть</button>
+            <button class="btn btn-secondary" onclick="collapseAll()">Свернуть</button>
+            <button class="btn btn-secondary" onclick="resetAll()">Сброс</button>
+            <button class="btn btn-excel" onclick="exportToExcel()">📥 Excel</button>
+            <span id="rc" style="color:#8b949e;font-size:13px"></span>
+        </div>
+        <div class="filters-row" id="filters-row"></div>
+        <div class="filters-row" id="date-filters"></div>
+        <div id="projects-container" class="loading">Загрузка данных...</div>
+    </div>
+</div>
+<script>
+let globalData=null;
+let activeStatus='all';
+
+function formatMoney(v){if(v===undefined||v===null)v=0;return v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');}
+function fmtHours(v){if(v===undefined||v===null)return '0';return Number(v).toFixed(1);}
+function esc(s){if(!s)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function escapeXml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function getEndOfMonth(ym){if(!ym)return null;let p=ym.split('-');return new Date(parseInt(p[0]),parseInt(p[1]),0);}
+function calcPV(startStr,finishStr,cutDate){if(!startStr||!finishStr||!cutDate)return null;let s=new Date(startStr),f=new Date(finishStr);if(isNaN(s)||isNaN(f))return null;let total=f-s;if(total<=0)return cutDate>=f?100:0;if(cutDate<=s)return 0;if(cutDate>=f)return 100;return Math.round((cutDate-s)/total*100);}
+function mkCell(val,type,style){return '<Cell ss:StyleID="'+style+'"><Data ss:Type="'+type+'">'+escapeXml(''+val)+'</Data></Cell>';}
+
+function recalcEVM(){let ym=document.getElementById('evmMonth').value;let cutDate=getEndOfMonth(ym);document.querySelectorAll('tr.task-row').forEach(row=>{let pvCell=row.querySelector('.pv-cell'),svCell=row.querySelector('.sv-cell');if(!pvCell||!svCell)return;let ev=parseInt(row.dataset.ev)||0;let pv=calcPV(row.dataset.start,row.dataset.finish,cutDate);if(pv===null){pvCell.innerHTML='<span class="evm-val evm-zero">—</span>';svCell.innerHTML='<span class="evm-val evm-zero">—</span>';return;}pvCell.innerHTML='<span class="evm-val">'+pv+'%</span>';let sv=ev-pv;let cls=sv>0?'evm-pos':(sv<0?'evm-neg':'evm-zero');svCell.innerHTML='<span class="evm-val '+cls+'">'+(sv>0?'+':'')+sv+'%</span>';});}
+
+function toggleChildren(uid,fid){let dc=document.querySelectorAll('tr[data-parent="'+uid+'"][data-file="'+fid+'"]');let btn=document.getElementById('tgl-'+fid+'-'+uid);let anyVis=false;dc.forEach(r=>{if(!r.classList.contains('hidden')&&!r.classList.contains('filtered-out'))anyVis=true;});if(anyVis){hideRec(uid,fid);if(btn)btn.textContent='▶';}else{dc.forEach(r=>{r.classList.remove('hidden');if(r.classList.contains('filtered-out'))r.classList.add('hidden');});if(btn)btn.textContent='▼';}}
+function hideRec(uid,fid){document.querySelectorAll('tr[data-parent="'+uid+'"][data-file="'+fid+'"]').forEach(r=>{r.classList.add('hidden');let cu=r.dataset.uid;if(cu){hideRec(cu,fid);let b=document.getElementById('tgl-'+fid+'-'+cu);if(b)b.textContent='▶';}});}
+function toggleProject(id){let b=document.getElementById('body-'+id);let ic=document.getElementById('icon-'+id);if(b.classList.contains('hidden')){b.classList.remove('hidden');if(ic)ic.textContent='▼';}else{b.classList.add('hidden');if(ic)ic.textContent='▶';}}
+function expandAll(){document.querySelectorAll('tr.task-row').forEach(r=>{if(!r.classList.contains('filtered-out'))r.classList.remove('hidden');});document.querySelectorAll('.toggle-btn').forEach(b=>b.textContent='▼');document.querySelectorAll('.project-body').forEach(b=>b.classList.remove('hidden'));document.querySelectorAll('.proj-icon').forEach(i=>i.textContent='▼');}
+function collapseAll(){document.querySelectorAll('tr.task-row').forEach(r=>{if(parseInt(r.dataset.level)>1)r.classList.add('hidden');});document.querySelectorAll('.toggle-btn').forEach(b=>b.textContent='▶');}
+
+async function saveNote(ta){let row=ta.closest('tr');if(!row)return;let projectName=row.dataset.file,taskUid=row.dataset.uid;if(!projectName||taskUid===undefined)return;let noteText=ta.value;ta.classList.remove('note-saved');ta.classList.add('note-saving');try{let url='/api/notes/'+encodeURIComponent(projectName)+'/'+encodeURIComponent(taskUid);let resp=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({note:noteText})});if(!resp.ok)throw new Error();let result=await resp.json();row.dataset.note=result.note||noteText;ta.classList.remove('note-saving');ta.classList.add('note-saved');setTimeout(()=>ta.classList.remove('note-saved'),2000);}catch(e){ta.classList.remove('note-saving');console.error(e);}}
+async function loadNote(projectName,taskUid,ta){if(!projectName||!taskUid)return '';try{let url='/api/notes/'+encodeURIComponent(projectName)+'/'+encodeURIComponent(taskUid);let resp=await fetch(url);if(!resp.ok)return '';let data=await resp.json();let note=data.note||'';if(ta){ta.value=note;let row=ta.closest('tr');if(row)row.dataset.note=note;}return note;}catch(e){console.error(e);return '';}}
+async function loadAllNotes(){let tas=document.querySelectorAll('textarea[id^="note-"]');for(let ta of tas){let row=ta.closest('tr');if(!row)continue;let pn=row.dataset.file,uid=row.dataset.uid;if(pn&&uid)await loadNote(pn,uid,ta);}}
+
+function buildTableRows(tasks,fileName,level,parentUid){if(!tasks||!tasks.length)return '';let rows='';for(let task of tasks){let indent=level*20;let toggle='';if(task.summary&&task.children&&task.children.length){toggle='<span class="toggle-btn" id="tgl-'+esc(fileName)+'-'+task.uid+'" onclick="event.stopPropagation();toggleChildren(\''+task.uid+'\',\''+esc(fileName)+'\')">▶</span>';}
+let resHtml=(task.resources||[]).map(r=>'<span class="resource-tag">'+esc(r)+'</span>').join(' ');
+let deptHtml=(task.departments||[]).map(d=>'<span class="dept-tag">'+esc(d)+'</span>').join(' ');
+let stCss='status-'+task.status;
+let evCls=task.percent_complete>=100?'evm-pos':(task.percent_complete===0?'evm-zero':'');
+let rowClass='task-row'+(task.summary?' summary-row':'')+(task.milestone?' milestone-row':'')+(level>0?' hidden':'');
+let noteId='note-'+fileName+'-'+task.uid;
+let workFmt=fmtHours(task.work);
+let remWorkFmt=fmtHours(task.remaining_work);
+let criticalMark=task.is_critical?'<span class="critical-badge" title="Критическая задача">⚠️</span>':'';
+let milestoneMark=task.milestone?'<span class="milestone-badge" title="Веха">🏁</span>':'';
+rows+='<tr class="'+rowClass+'" data-level="'+level+'" data-parent="'+esc(String(parentUid))+'" data-file="'+esc(fileName)+'" data-uid="'+esc(String(task.uid))+'" data-name="'+esc(task.name)+'" data-outline="'+esc(task.outline_number||'')+'" data-resources="'+esc((task.resources||[]).join('|||'))+'" data-departments="'+esc((task.departments||[]).join('|||'))+'" data-start="'+esc(task.start||'')+'" data-finish="'+esc(task.finish||'')+'" data-status="'+esc(task.status)+'" data-ev="'+task.percent_complete+'" data-cost="'+task.cost+'" data-actual-cost="'+task.actual_cost+'" data-note="">'+
+'<td style="white-space:nowrap;color:#8b949e">'+esc(task.outline_number||'')+'</td>'+
+'<td style="white-space:normal;word-break:break-word"><span class="indent" style="width:'+indent+'px"></span>'+toggle+esc(task.name)+'</td>'+
+'<td><span class="status-badge '+stCss+'">'+esc(task.status_label)+'</span></td>'+
+'<td><span class="evm-val '+evCls+'">'+task.percent_complete+'%</span></td>'+
+'<td class="pv-cell"><span class="evm-val evm-zero">—</span></td>'+
+'<td class="sv-cell"><span class="evm-val evm-zero">—</span></td>'+
+'<td style="white-space:nowrap;text-align:right">'+formatMoney(task.cost)+'</td>'+
+'<td style="white-space:nowrap;text-align:right">'+formatMoney(task.actual_cost)+'</td>'+
+'<td style="white-space:nowrap;text-align:right">'+workFmt+'</td>'+
+'<td style="white-space:nowrap;text-align:right">'+remWorkFmt+'</td>'+
+'<td style="text-align:center">'+criticalMark+'</td>'+
+'<td style="text-align:center">'+milestoneMark+'</td>'+
+'<td>'+esc(task.start||'')+'</td>'+
+'<td>'+esc(task.finish||'')+'</td>'+
+'<td>'+resHtml+'</td>'+
+'<td>'+deptHtml+'</td>'+
+'<td class="note-cell"><textarea id="'+esc(noteId)+'" rows="2" placeholder="Заметка..." onblur="saveNote(this)"></textarea></td>'+
+'</tr>';
+if(task.children&&task.children.length) rows+=buildTableRows(task.children,fileName,level+1,task.uid);}
+return rows;}
+
+function buildUI(data){
+    globalData=data;
+    let stats=data.stats,filters=data.filters,projects=data.projects;
+    document.getElementById('subtitle').textContent=new Date().toLocaleString()+' | Файлов: '+projects.length;
+    let statsContainer=document.getElementById('stats-container');
+    statsContainer.innerHTML='<div class="stat-card"><div class="label">Задач</div><div class="value">'+stats.total_tasks+'</div></div>'+
+        '<div class="stat-card"><div class="label">Суммарных</div><div class="value">'+stats.total_summary+'</div></div>'+
+        '<div class="stat-card"><div class="label">Вех</div><div class="value">'+stats.total_milestones+'</div></div>'+
+        '<div class="stat-card"><div class="label">Не начато</div><div class="value grey">'+stats.cnt_notstarted+'</div></div>'+
+        '<div class="stat-card"><div class="label">В работе</div><div class="value yellow">'+stats.cnt_inprog+'</div></div>'+
+        '<div class="stat-card"><div class="label">Завершено</div><div class="value green">'+stats.cnt_done+'</div></div>'+
+        '<div class="stat-card"><div class="label">Трудоёмкость, ч</div><div class="value">'+fmtHours(stats.total_work)+'</div></div>';
+    let fileSelect=document.getElementById('ff');
+    fileSelect.innerHTML='<option value="">Все файлы</option>'+projects.map(p=>'<option value="'+esc(p.name)+'">'+esc(p.name)+'</option>').join('');
+    let filtersRow=document.getElementById('filters-row');
+    filtersRow.innerHTML='<div class="filter-group"><label>👤 Исполнители:</label><div class="multiselect-wrap"><div class="multiselect-btn" onclick="toggleMultiselect(\'resDropdown\')">Все ('+filters.all_resources.length+')</div><div class="multiselect-dropdown" id="resDropdown"><div class="ms-controls"><span onclick="msSelectAll(\'resDropdown\')">Выбрать все</span><span onclick="msDeselectAll(\'resDropdown\')">Снять все</span></div>'+filters.all_resources.map(r=>'<label><input type="checkbox" value="'+esc(r)+'" checked onchange="updateMsLabel(\'resDropdown\');applyAllFilters()"> '+esc(r)+'</label>').join('')+'</div></div></div>'+
+        '<div class="filter-group"><label>🏢 Отделы:</label><div class="multiselect-wrap"><div class="multiselect-btn" onclick="toggleMultiselect(\'deptDropdown\')">Все ('+filters.all_departments.length+')</div><div class="multiselect-dropdown" id="deptDropdown"><div class="ms-controls"><span onclick="msSelectAll(\'deptDropdown\')">Выбрать все</span><span onclick="msDeselectAll(\'deptDropdown\')">Снять все</span></div>'+filters.all_departments.map(d=>'<label><input type="checkbox" value="'+esc(d)+'" checked onchange="updateMsLabel(\'deptDropdown\');applyAllFilters()"> '+esc(d)+'</label>').join('')+'</div></div></div>';
+    let today=new Date(); let currentMonth=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0');
+    let dateFiltersDiv=document.getElementById('date-filters');
+    dateFiltersDiv.innerHTML='<div class="filter-group"><label>📅 С:</label><input type="date" id="dateFrom" onchange="applyAllFilters()"></div>'+
+        '<div class="filter-group"><label>По:</label><input type="date" id="dateTo" onchange="applyAllFilters()"></div>'+
+        '<div class="filter-group"><label>📊 Уровень:</label><input type="range" id="levelSlider" min="0" max="'+stats.max_level+'" value="'+stats.max_level+'" oninput="onLevelChange(this.value)"><span class="level-value" id="levelVal">'+stats.max_level+'</span></div>'+
+        '<div class="filter-group"><label>📈 EVM срез:</label><input type="month" id="evmMonth" value="'+currentMonth+'" onchange="recalcEVM()"></div>'+
+        '<div class="filter-group"><label>📋 Статус:</label><div class="status-filter"><span class="status-chip chip-all active" onclick="setStatusFilter(\'all\')">Все</span><span class="status-chip chip-notstarted" onclick="setStatusFilter(\'notstarted\')">Не начата</span><span class="status-chip chip-inprogress" onclick="setStatusFilter(\'inprogress\')">В работе</span><span class="status-chip chip-done" onclick="setStatusFilter(\'done\')">Завершена</span></div></div>'+
+        '<div class="filter-group"><label>⚠️ Критические:</label><input type="checkbox" id="criticalOnly" onchange="applyAllFilters()"></div>';
+    let container=document.getElementById('projects-container');
+    container.innerHTML='';
+    projects.forEach((proj,idx)=>{
+        let projId='f'+idx;
+        let projHtml='<div class="project-section"><div class="project-header" onclick="toggleProject(\''+projId+'\')"><h2><span class="proj-icon" id="icon-'+projId+'">▼</span> '+esc(proj.name)+'</h2><span class="badge">'+proj.tasks_count+' задач</span></div><div class="project-body" id="body-'+projId+'"><table><thead><tr><th>WBS</th><th>Название</th><th>Статус</th><th>EV факт</th><th>PV план</th><th>SV Δ</th><th>Стоимость, руб</th><th>Выполнено (на тек.дату), руб</th><th>Work, ч</th><th>Осталось, ч</th><th>Крит.</th><th>Веха</th><th>Начало</th><th>Конец</th><th>Ресурсы</th><th>Отдел</th><th>Заметки</th></tr></thead><tbody>'+buildTableRows(proj.tree,proj.name,0,'')+'</tbody></table></div></div>';
+        container.innerHTML+=projHtml;
+    });
+    setTimeout(()=>loadAllNotes(),100);
+    recalcEVM();
+}
+
+function toggleMultiselect(id){let el=document.getElementById(id);if(el)el.classList.toggle('open');}
+document.addEventListener('click',function(e){document.querySelectorAll('.multiselect-dropdown.open').forEach(dd=>{if(!dd.parentElement.contains(e.target))dd.classList.remove('open');});});
+function msSelectAll(id){document.querySelectorAll('#'+id+' input[type=checkbox]').forEach(cb=>cb.checked=true);updateMsLabel(id);applyAllFilters();}
+function msDeselectAll(id){document.querySelectorAll('#'+id+' input[type=checkbox]').forEach(cb=>cb.checked=false);updateMsLabel(id);applyAllFilters();}
+function updateMsLabel(ddId){let wrap=document.getElementById(ddId).parentElement;let btn=wrap.querySelector('.multiselect-btn');let checked=wrap.querySelectorAll('input[type=checkbox]:checked');let total=wrap.querySelectorAll('input[type=checkbox]');if(checked.length===0)btn.textContent='Не выбрано';else if(checked.length===total.length)btn.textContent='Все ('+total.length+')';else{let names=[];checked.forEach(c=>names.push(c.value));btn.textContent=names.slice(0,2).join(', ')+(names.length>2?' +'+(names.length-2):'');}}
+function onLevelChange(val){document.getElementById('levelVal').textContent=val;applyAllFilters();}
+function setStatusFilter(status){activeStatus=status;document.querySelectorAll('.status-chip').forEach(c=>c.classList.remove('active'));let chip=document.getElementById('chip-'+status);if(chip)chip.classList.add('active');applyAllFilters();}
+function applyAllFilters(){
+    let q=document.getElementById('si').value.toLowerCase().trim();
+    let ff=document.getElementById('ff').value;
+    let maxLvl=parseInt(document.getElementById('levelSlider').value);
+    let dateFrom=document.getElementById('dateFrom').value;
+    let dateTo=document.getElementById('dateTo').value;
+    let criticalOnly=document.getElementById('criticalOnly').checked;
+    let resCbs=document.querySelectorAll('#resDropdown input[type=checkbox]:checked');
+    let allResCbs=document.querySelectorAll('#resDropdown input[type=checkbox]');
+    let resAllSelected=(resCbs.length===allResCbs.length);
+    let resNone=(resCbs.length===0);
+    let selRes=new Set(); resCbs.forEach(c=>selRes.add(c.value.toLowerCase()));
+    let deptCbs=document.querySelectorAll('#deptDropdown input[type=checkbox]:checked');
+    let allDeptCbs=document.querySelectorAll('#deptDropdown input[type=checkbox]');
+    let deptAllSelected=(deptCbs.length===allDeptCbs.length);
+    let deptNone=(deptCbs.length===0);
+    let selDept=new Set(); deptCbs.forEach(c=>selDept.add(c.value.toLowerCase()));
+    let count=0;
+    document.querySelectorAll('tr.task-row').forEach(row=>{
+        let lvl=parseInt(row.dataset.level)||0;
+        let name=(row.dataset.name||'').toLowerCase();
+        let outline=(row.dataset.outline||'').toLowerCase();
+        let resRaw=(row.dataset.resources||'');
+        let deptRaw=(row.dataset.departments||'');
+        let note=(row.dataset.note||'').toLowerCase();
+        let file=row.dataset.file||'';
+        let rStart=row.dataset.start||'';
+        let rFinish=row.dataset.finish||'';
+        let rowStatus=row.dataset.status||'notstarted';
+        let isCritical=row.querySelector('.critical-badge')!==null;
+        let resList=resRaw.split('|||').filter(Boolean).map(r=>r.toLowerCase());
+        let deptList=deptRaw.split('|||').filter(Boolean).map(d=>d.toLowerCase());
+        let pass=true;
+        if(pass)pass=(lvl<=maxLvl);
+        if(pass&&q)pass=(name.indexOf(q)!==-1||outline.indexOf(q)!==-1||resRaw.toLowerCase().indexOf(q)!==-1||deptRaw.toLowerCase().indexOf(q)!==-1||note.indexOf(q)!==-1);
+        if(pass&&ff)pass=(file===ff);
+        if(pass&&!resAllSelected&&!resNone){if(resList.length===0)pass=false;else{let found=false;for(let r of resList)if(selRes.has(r)){found=true;break;}pass=found;}}
+        if(pass&&!deptAllSelected&&!deptNone){if(deptList.length===0)pass=false;else{let found=false;for(let d of deptList)if(selDept.has(d)){found=true;break;}pass=found;}}
+        if(pass&&dateFrom&&rStart)pass=(rStart>=dateFrom);
+        if(pass&&dateTo&&rFinish)pass=(rFinish<=dateTo);
+        if(pass&&activeStatus!=='all')pass=(rowStatus===activeStatus);
+        if(pass&&criticalOnly)pass=isCritical;
+        if(pass){row.classList.remove('filtered-out','hidden');count++;}
+        else{row.classList.add('filtered-out','hidden');}
+    });
+    document.getElementById('rc').textContent=count>0?'Найдено: '+count:'';
+}
+function resetAll(){
+    document.getElementById('si').value='';
+    document.getElementById('ff').value='';
+    document.getElementById('dateFrom').value='';
+    document.getElementById('dateTo').value='';
+    document.getElementById('criticalOnly').checked=false;
+    let ls=document.getElementById('levelSlider');if(ls){ls.value=ls.max;document.getElementById('levelVal').textContent=ls.max;}
+    let today=new Date();document.getElementById('evmMonth').value=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0');
+    msSelectAll('resDropdown');msSelectAll('deptDropdown');
+    activeStatus='all';document.querySelectorAll('.status-chip').forEach(c=>c.classList.remove('active'));let chip=document.getElementById('chip-all');if(chip)chip.classList.add('active');
+    document.querySelectorAll('tr.task-row').forEach(r=>r.classList.remove('filtered-out'));
+    expandAll();collapseAll();recalcEVM();document.getElementById('rc').textContent='';
+}
+async function exportToExcel(){
+    let ym=document.getElementById('evmMonth').value||'';
+    let cutDate=getEndOfMonth(ym);
+    let rows=[];
+    let statusMap={done:'Завершена',inprogress:'В работе',notstarted:'Не начата'};
+    document.querySelectorAll('tr.task-row').forEach(row=>{
+        if(row.classList.contains('hidden')||row.classList.contains('filtered-out'))return;
+        let ev=parseInt(row.dataset.ev)||0;
+        let pv=calcPV(row.dataset.start,row.dataset.finish,cutDate);
+        let sv=(pv!==null)?(ev-pv):null;
+        let noteText=row.dataset.note||'';
+        if(!noteText){let ta=row.querySelector('textarea');if(ta)noteText=ta.value;}
+        rows.push({
+            file:row.dataset.file||'',
+            wbs:row.dataset.outline||'',
+            name:row.dataset.name||'',
+            status:statusMap[row.dataset.status]||'',
+            ev:ev,
+            pv:pv!==null?pv:'',
+            sv:sv!==null?sv:'',
+            cost:row.dataset.cost||'0',
+            actualCost:row.dataset.actualCost||'0',
+            work:row.querySelector('td:nth-child(9)')?.innerText||'0',
+            remainingWork:row.querySelector('td:nth-child(10)')?.innerText||'0',
+            isCritical:row.querySelector('.critical-badge')!==null?'Да':'Нет',
+            isMilestone:row.querySelector('.milestone-badge')!==null?'Да':'Нет',
+            start:row.dataset.start||'',
+            finish:row.dataset.finish||'',
+            resources:(row.dataset.resources||'').split('|||').filter(Boolean).join(', '),
+            departments:(row.dataset.departments||'').split('|||').filter(Boolean).join(', '),
+            notes:noteText
+        });
+    });
+    if(rows.length===0){alert('Нет видимых строк для выгрузки');return;}
+    let xml='<?xml version="1.0" encoding="UTF-8"?>\n<?mso-application progid="Excel.Sheet"?>\n<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">\n<Styles>\n<Style ss:ID="hdr"><Font ss:Bold="1" ss:Size="11"/><Interior ss:Color="#D9E1F2" ss:Pattern="Solid"/></Style>\n<Style ss:ID="pos"><Font ss:Color="#006100"/><Interior ss:Color="#C6EFCE"/></Style>\n<Style ss:ID="neg"><Font ss:Color="#9C0006"/><Interior ss:Color="#FFC7CE"/></Style>\n<Style ss:ID="def"></Style>\n</Styles>\n<Worksheet ss:Name="WBS Export">\n<Table>\n<Column ss:Width="120"/><Column ss:Width="60"/><Column ss:Width="300"/><Column ss:Width="90"/><Column ss:Width="65"/><Column ss:Width="65"/><Column ss:Width="65"/><Column ss:Width="100"/><Column ss:Width="120"/><Column ss:Width="80"/><Column ss:Width="80"/><Column ss:Width="50"/><Column ss:Width="50"/><Column ss:Width="90"/><Column ss:Width="90"/><Column ss:Width="200"/><Column ss:Width="120"/><Column ss:Width="250"/>\n<Row>';
+    ['Файл','WBS','Название','Статус','EV %','PV %','SV %','Стоимость, руб','Выполнено, руб','Work, ч','Осталось, ч','Крит.','Веха','Начало','Конец','Ресурсы','Отдел','Заметки'].forEach(h=>{xml+='<Cell ss:StyleID="hdr"><Data ss:Type="String">'+escapeXml(h)+'</Data></Cell>';});
+    xml+='</Row>\n';
+    rows.forEach(r=>{
+        xml+='<Row>';
+        xml+=mkCell(r.file,'String','def');
+        xml+=mkCell(r.wbs,'String','def');
+        xml+=mkCell(r.name,'String','def');
+        xml+=mkCell(r.status,'String','def');
+        xml+=mkCell(r.ev,'Number','def');
+        xml+=mkCell(r.pv===''?'':''+r.pv,r.pv===''?'String':'Number','def');
+        if(r.sv==='') xml+=mkCell('','String','def');
+        else xml+=mkCell(''+r.sv,'Number',r.sv>0?'pos':(r.sv<0?'neg':'def'));
+        xml+=mkCell(r.cost,'Number','def');
+        xml+=mkCell(r.actualCost,'Number','def');
+        xml+=mkCell(r.work,'Number','def');
+        xml+=mkCell(r.remainingWork,'Number','def');
+        xml+=mkCell(r.isCritical,'String','def');
+        xml+=mkCell(r.isMilestone,'String','def');
+        xml+=mkCell(r.start,'String','def');
+        xml+=mkCell(r.finish,'String','def');
+        xml+=mkCell(r.resources,'String','def');
+        xml+=mkCell(r.departments,'String','def');
+        xml+=mkCell(r.notes,'String','def');
+        xml+='</Row>\n';
+    });
+    xml+='</Table>\n</Worksheet>\n</Workbook>';
+    let blob=new Blob([xml],{type:'application/vnd.ms-excel;charset=utf-8'});
+    let url=URL.createObjectURL(blob);
+    let a=document.createElement('a');a.href=url;a.download='wbs_export_'+new Date().toISOString().slice(0,10)+'.xls';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+}
+async function init(){try{let resp=await fetch('/api/projects');let data=await resp.json();if(data.error){document.getElementById('projects-container').innerHTML='<div class="error">Ошибка: '+esc(data.error)+'</div>';return;}buildUI(data);}catch(e){console.error(e);document.getElementById('projects-container').innerHTML='<div class="error">Ошибка загрузки данных</div>';}}
+init();
+</script>
+</body>
+</html>

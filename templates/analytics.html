@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Аналитика «Было / Стало» — WBS Viewer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#0f1923;color:#c9d1d9;padding:20px}
+        a{color:#58a6ff;text-decoration:none}
+        a:hover{text-decoration:underline}
+        h1{text-align:center;color:#58a6ff;margin-bottom:5px;font-size:24px}
+        h2{color:#58a6ff;font-size:18px;margin:20px 0 12px}
+        h3{color:#79c0ff;font-size:15px;margin:14px 0 8px}
+        .subtitle{text-align:center;color:#8b949e;margin-bottom:18px;font-size:13px}
+        .nav{display:flex;gap:20px;justify-content:center;margin-bottom:18px;padding:10px;background:#161b22;border-radius:8px;border:1px solid #30363d}
+        .nav a{font-weight:600;font-size:14px;padding:6px 16px;border-radius:6px;transition:.2s}
+        .nav a:hover{background:#1c2331;text-decoration:none}
+        .nav a.active{background:#1f6feb;color:#fff}
+        .controls-panel{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px;margin-bottom:18px}
+        .controls-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+        .ctrl-group{display:flex;align-items:center;gap:6px}
+        .ctrl-group label{font-size:12px;color:#8b949e;white-space:nowrap}
+        select,input[type="date"]{padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:13px;outline:none}
+        .btn{padding:9px 18px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;transition:.2s}
+        .btn-primary{background:#238636;color:#fff}
+        .btn-primary:hover{background:#2ea043}
+        .btn-secondary{background:#30363d;color:#c9d1d9}
+        .mode-tabs{display:flex;gap:4px;margin-bottom:10px}
+        .mode-tab{padding:8px 20px;border-radius:6px 6px 0 0;cursor:pointer;font-size:13px;font-weight:600;background:#21262d;color:#8b949e;border:1px solid #30363d;border-bottom:none;transition:.2s}
+        .mode-tab.active{background:#161b22;color:#58a6ff;border-color:#58a6ff;border-bottom:1px solid #161b22}
+        .cards{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+        .card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:14px 20px;min-width:130px;flex:1}
+        .card .lbl{font-size:11px;color:#8b949e;text-transform:uppercase}
+        .card .val{font-size:22px;font-weight:700;color:#58a6ff;margin-top:4px}
+        .card .val.green{color:#56d364}
+        .card .val.red{color:#f85149}
+        .card .val.yellow{color:#d29922}
+        .table-wrap{overflow-x:auto;margin-bottom:20px}
+        table{width:100%;border-collapse:collapse;font-size:12px}
+        th{background:#161b22;padding:10px 10px;text-align:left;font-weight:600;color:#8b949e;border-bottom:2px solid #30363d;white-space:nowrap}
+        td{padding:7px 10px;border-bottom:1px solid #21262d;vertical-align:top}
+        tr:hover td{background:#161b22}
+        .delta-pos{color:#56d364;font-weight:600}
+        .delta-neg{color:#f85149;font-weight:600}
+        .delta-zero{color:#8b949e}
+        .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+        .badge-green{background:#1a2e1a;color:#56d364}
+        .badge-yellow{background:#2a2200;color:#d29922}
+        .badge-red{background:#2d1a1a;color:#f85149}
+        .rag{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px}
+        .rag.red{background:#f85149}
+        .rag.yellow{background:#d29922}
+        .rag.green{background:#56d364}
+        .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:20px}
+        .chart-box{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px}
+        .chart-box canvas{max-height:350px}
+        .tab-bar{display:flex;gap:4px;margin-bottom:0}
+        .tab-btn{padding:9px 22px;border-radius:6px 6px 0 0;cursor:pointer;font-size:13px;font-weight:600;background:#21262d;color:#8b949e;border:1px solid #30363d;border-bottom:none}
+        .tab-btn.active{background:#161b22;color:#58a6ff;border-color:#30363d;border-bottom:1px solid #161b22}
+        .tab-content{background:#161b22;border:1px solid #30363d;border-radius:0 8px 8px 8px;padding:18px;display:none}
+        .tab-content.active{display:block}
+        .heatmap-table td{text-align:center;font-size:11px;padding:4px}
+        .heatmap-table th{font-size:10px;padding:4px 6px}
+        .overdue-toggle{cursor:pointer;color:#58a6ff;font-size:11px;text-decoration:underline}
+        .overdue-detail{display:none;margin-top:6px;padding:6px;background:#0d1117;border-radius:4px;font-size:11px}
+        .overdue-detail.open{display:block}
+        .hidden{display:none}
+        .loading{text-align:center;padding:40px;color:#58a6ff}
+        .error{text-align:center;padding:30px;color:#f85149;background:#2d1a1a;border-radius:8px}
+        .pi-bar-wrap{width:120px;background:#21262d;border-radius:4px;height:16px;display:inline-block;vertical-align:middle;margin-right:6px}
+        .pi-bar{height:100%;border-radius:4px}
+        .pi-bar.green{background:#238636}
+        .pi-bar.yellow{background:#9e6a03}
+        .pi-bar.red{background:#da3633}
+        @media(max-width:900px){.chart-grid{grid-template-columns:1fr}}
+    </style>
+</head>
+<body>
+<div class="nav">
+    <a href="/">📊 WBS Viewer</a>
+    <a href="/analytics" class="active">📈 Аналитика «Было / Стало»</a>
+</div>
+<h1>📈 Аналитика «Было / Стало»</h1>
+<p class="subtitle" id="subtitle">Выберите срез и нажмите «Загрузить»</p>
+<div class="controls-panel">
+    <div class="mode-tabs">
+        <div class="mode-tab active" id="modeTabSingle" onclick="setMode('single')">Один срез</div>
+        <div class="mode-tab" id="modeTabCompare" onclick="setMode('compare')">Сравнение двух срезов</div>
+    </div>
+    <div id="singleControls" class="controls-row">
+        <div class="ctrl-group"><label>Снапшот:</label><select id="snap1"><option>Загрузка…</option></select></div>
+        <div class="ctrl-group"><label>Дата среза:</label><input type="date" id="cutoff1"></div>
+        <button class="btn btn-primary" onclick="loadSingle()">📊 Загрузить</button>
+    </div>
+    <div id="compareControls" class="hidden">
+        <div class="controls-row">
+            <div class="ctrl-group"><label>«Было» снапшот:</label><select id="snapA"></select></div>
+            <div class="ctrl-group"><label>Дата:</label><input type="date" id="cutoffA"></div>
+            <div class="ctrl-group" style="margin-left:20px"><label>«Стало» снапшот:</label><select id="snapB"></select></div>
+            <div class="ctrl-group"><label>Дата:</label><input type="date" id="cutoffB"></div>
+            <button class="btn btn-primary" onclick="loadCompare()">⚖️ Сравнить</button>
+        </div>
+    </div>
+</div>
+<div id="resultsArea"></div>
+<script>
+let currentMode = 'single';
+let chartInstances = {};
+
+function esc(s){ return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
+function fmt(v){ if(v===undefined||v===null) return '0'; let n=Number(v); if(isNaN(n)) return String(v); return n.toLocaleString('ru-RU',{minimumFractionDigits:0,maximumFractionDigits:1}); }
+function fmtMoney(v){ if(!v) return '0.00'; return Number(v).toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function deltaHtml(val,invert){ if(val===undefined||val===null) return ''; let n=Number(val); if(n===0) return '<span class="delta-zero">0</span>'; let good=invert?(n<0):(n>0); let cls=good?'delta-pos':'delta-neg'; let sign=n>0?'+':''; return '<span class="'+cls+'">'+sign+fmt(n)+'</span>'; }
+function destroyChart(id){ if(chartInstances[id]){chartInstances[id].destroy(); delete chartInstances[id];} }
+
+function setMode(mode){
+    currentMode=mode;
+    document.getElementById('modeTabSingle').classList.toggle('active',mode==='single');
+    document.getElementById('modeTabCompare').classList.toggle('active',mode==='compare');
+    document.getElementById('singleControls').classList.toggle('hidden',mode!=='single');
+    document.getElementById('compareControls').classList.toggle('hidden',mode!=='compare');
+}
+
+async function loadSnapshots(){
+    try{
+        let resp=await fetch('/api/analytics/snapshots');
+        let snaps=await resp.json();
+        if(snaps.error) return;
+        ['snap1','snapA','snapB'].forEach(id=>{
+            let sel=document.getElementById(id);
+            sel.innerHTML='';
+            snaps.forEach(s=>{let opt=document.createElement('option');opt.value=s.id;opt.textContent=s.label;sel.appendChild(opt);});
+        });
+        let today=new Date().toISOString().slice(0,10);
+        document.getElementById('cutoff1').value=today;
+        document.getElementById('cutoffA').value=today;
+        document.getElementById('cutoffB').value=today;
+    }catch(e){console.error(e);}
+}
+
+async function loadSingle(){
+    let snap=document.getElementById('snap1').value;
+    let cutoff=document.getElementById('cutoff1').value;
+    let area=document.getElementById('resultsArea');
+    area.innerHTML='<div class="loading">⏳ Загрузка аналитики…</div>';
+    document.getElementById('subtitle').textContent='Загрузка…';
+    try{
+        let resp=await fetch(`/api/analytics/single?snapshot=${encodeURIComponent(snap)}&cutoff=${encodeURIComponent(cutoff)}`);
+        let data=await resp.json();
+        if(data.error){area.innerHTML=`<div class="error">${esc(data.error)}</div>`;return;}
+        renderSingle(data);
+        document.getElementById('subtitle').textContent=`Срез: ${snap} | Дата: ${cutoff} | ${new Date().toLocaleString()}`;
+    }catch(e){area.innerHTML=`<div class="error">Ошибка: ${esc(e.message)}</div>`;}
+}
+
+async function loadCompare(){
+    let s1=document.getElementById('snapA').value;
+    let s2=document.getElementById('snapB').value;
+    let c1=document.getElementById('cutoffA').value;
+    let c2=document.getElementById('cutoffB').value;
+    let area=document.getElementById('resultsArea');
+    area.innerHTML='<div class="loading">⏳ Сравнение срезов…</div>';
+    try{
+        let resp=await fetch(`/api/analytics/compare?snap1=${encodeURIComponent(s1)}&snap2=${encodeURIComponent(s2)}&cutoff1=${encodeURIComponent(c1)}&cutoff2=${encodeURIComponent(c2)}`);
+        let data=await resp.json();
+        if(data.error){area.innerHTML=`<div class="error">${esc(data.error)}</div>`;return;}
+        renderCompare(data);
+        document.getElementById('subtitle').textContent=`Сравнение: ${s1} (${c1}) → ${s2} (${c2}) | ${new Date().toLocaleString()}`;
+    }catch(e){area.innerHTML=`<div class="error">Ошибка: ${esc(e.message)}</div>`;}
+}
+
+function renderSingle(data){
+    let totals={total:0,done:0,inprog:0,nostart:0,bac:0,ev:0,ac:0,pv:0,overdue:0,total_work:0,remaining_work:0};
+    data.projects.forEach(p=>{
+        totals.total+=p.total; totals.done+=p.done; totals.inprog+=p.in_progress;
+        totals.nostart+=p.not_started; totals.bac+=p.bac; totals.ev+=p.ev;
+        totals.ac+=p.ac; totals.pv+=p.pv; totals.overdue+=p.overdue_count;
+        totals.total_work+=p.total_work||0; totals.remaining_work+=p.remaining_work||0;
+    });
+    let cv=totals.ev-totals.ac, sv=totals.ev-totals.pv;
+    let ragSummary=data.rag_summary||{red:0,yellow:0,green:0};
+
+    let html=`<div class="cards">
+        <div class="card"><div class="lbl">Задач</div><div class="val">${totals.total}</div></div>
+        <div class="card"><div class="lbl">Завершено</div><div class="val green">${totals.done}</div></div>
+        <div class="card"><div class="lbl">В работе</div><div class="val yellow">${totals.inprog}</div></div>
+        <div class="card"><div class="lbl">Просрочено</div><div class="val red">${totals.overdue}</div></div>
+        <div class="card"><div class="lbl">Трудоёмкость, ч</div><div class="val">${fmt(totals.total_work)}</div></div>
+        <div class="card"><div class="lbl">Осталось, ч</div><div class="val">${fmt(totals.remaining_work)}</div></div>
+        <div class="card"><div class="lbl">BAC</div><div class="val">${fmtMoney(totals.bac)}</div></div>
+        <div class="card"><div class="lbl">EV</div><div class="val green">${fmtMoney(totals.ev)}</div></div>
+        <div class="card"><div class="lbl">CV</div><div class="val ${cv>=0?'green':'red'}">${fmtMoney(cv)}</div></div>
+        <div class="card"><div class="lbl">RAG</div><div class="val">🔴 ${ragSummary.red} 🟡 ${ragSummary.yellow} 🟢 ${ragSummary.green}</div></div>
+    </div>`;
+
+    html+=`<div class="tab-bar">
+        <div class="tab-btn active" onclick="switchTab('tabProj',this)">📁 Проекты</div>
+        <div class="tab-btn" onclick="switchTab('tabRes',this)">👤 Исполнители</div>
+        <div class="tab-btn" onclick="switchTab('tabCharts',this)">📊 Графики</div>
+    </div>`;
+
+    // Проекты
+    html+=`<div class="tab-content active" id="tabProj"><div class="table-wrap"><table><thead><tr>
+        <th>Проект</th><th>Всего</th><th>✅</th><th>🔄</th><th>⬜</th><th>%</th>
+        <th>BAC</th><th>EV</th><th>AC</th><th>PV</th><th>CV</th><th>SV</th>
+        <th>CPI</th><th>SPI</th><th>Трудоёмкость, ч</th><th>Осталось, ч</th><th>Прогноз финиша</th><th>Просрочки</th><th>RAG</th>
+    </tr></thead><tbody>`;
+    data.projects.forEach(p=>{
+        html+=`<tr>
+            <td><b>${esc(p.project)}</b></td>
+            <td>${p.total}</td><td>${p.done}</td><td>${p.in_progress}</td><td>${p.not_started}</td>
+            <td>${p.completion_pct}%</td>
+            <td style="text-align:right">${fmtMoney(p.bac)}</td><td style="text-align:right">${fmtMoney(p.ev)}</td>
+            <td style="text-align:right">${fmtMoney(p.ac)}</td><td style="text-align:right">${fmtMoney(p.pv)}</td>
+            <td>${deltaHtml(p.cv)}</td><td>${deltaHtml(p.sv)}</td>
+            <td>${(p.cpi||0).toFixed(2)}</td><td>${(p.spi||0).toFixed(2)}</td>
+            <td style="text-align:right">${fmt(p.total_work)}</td><td style="text-align:right">${fmt(p.remaining_work)}</td>
+            <td>${p.forecast_finish||'—'}</td>
+            <td>${p.overdue_count>0?`<span class="badge badge-red">${p.overdue_count}</span>`:'<span class="badge badge-green">0</span>'}</td>
+            <td><span class="rag ${p.rag_status}"></span>${p.rag_status.toUpperCase()}</td>
+        </tr>`;
+    });
+    html+=`</tbody></table></div></div>`;
+
+    // Исполнители
+    html+=`<div class="tab-content" id="tabRes">`;
+    html+=renderResourceTable(data.resources);
+    html+=`</div>`;
+
+    // Графики
+    html+=`<div class="tab-content" id="tabCharts">
+        <div class="chart-grid">
+            <div class="chart-box"><h3>📈 S-кривая (PV / EV / AC)</h3><canvas id="chartTimeline"></canvas></div>
+            <div class="chart-box"><h3>📊 Выполнение по проектам</h3><canvas id="chartProjCompletion"></canvas></div>
+            <div class="chart-box"><h3>🚨 Динамика просрочек</h3><canvas id="chartOverdueDyn"></canvas></div>
+            <div class="chart-box"><h3>🏆 Топ-10 исполнителей по EV</h3><canvas id="chartTopEV"></canvas></div>
+        </div>
+        <h3>🗺️ Тепловая карта загрузки (трудоёмкость, ч: ресурс × проект)</h3>
+        <div class="table-wrap" id="heatmapArea"></div>
+    </div>`;
+    document.getElementById('resultsArea').innerHTML=html;
+    setTimeout(()=>renderSingleCharts(data),100);
+}
+
+function renderResourceTable(resources){
+    let h='<div class="table-wrap"><table><thead><tr>';
+    h+='<th>Исполнитель</th><th>Отдел</th><th>Задач</th><th>✅</th><th>🔄</th><th>⬜</th>';
+    h+='<th>% (задачи)</th><th>% (EV)</th><th>EV</th><th>BAC</th>';
+    h+='<th>Work, ч</th><th>Осталось, ч</th><th>Просрочки</th><th>Σ дней</th><th>Индекс П.</th><th>Детали</th>';
+    h+='</tr></thead><tbody>';
+    resources.forEach((r,i)=>{
+        let piCls=r.status_color;
+        h+=`<tr>
+            <td><b>${esc(r.name)}</b></td><td>${esc(r.department)}</td>
+            <td>${r.total}</td><td>${r.done}</td><td>${r.inprog}</td><td>${r.nostart}</td>
+            <td>${r.completion_pct}%</td><td>${r.weighted_pct}%</td>
+            <td style="text-align:right">${fmtMoney(r.ev)}</td><td style="text-align:right">${fmtMoney(r.bac)}</td>
+            <td style="text-align:right">${fmt(r.work)}</td><td style="text-align:right">${fmt(r.remaining_work)}</td>
+            <td>${r.overdue_count>0?`<span class="badge badge-red">${r.overdue_count}</span>`:'<span class="badge badge-green">0</span>'}</td>
+            <td>${r.delay_sum}</td>
+            <td><div class="pi-bar-wrap"><div class="pi-bar ${piCls}" style="width:${Math.min(r.productivity_index,100)}%"></div></div>${r.productivity_index}%</td>
+            <td>${r.overdue_tasks&&r.overdue_tasks.length?`<span class="overdue-toggle" onclick="toggleOverdue('od${i}')">Показать (${r.overdue_tasks.length})</span><div class="overdue-detail" id="od${i}">${r.overdue_tasks.map(ot=>`<div class="overdue-item">📌 ${esc(ot.name)} — план: ${ot.finish}, факт: ${ot.percent}%, просрочка: <b>${ot.delay_days} дн.</b> ${ot.is_critical?'⚠️ критич.':''}</div>`).join('')}</div>`:'—'}</td>
+        </tr>`;
+    });
+    h+='</tbody></table></div>';
+    return h;
+}
+
+function renderSingleCharts(data){
+    if(data.timeline&&data.timeline.labels&&data.timeline.labels.length){
+        destroyChart('chartTimeline');
+        let ctx=document.getElementById('chartTimeline');
+        if(ctx){
+            let evLine=data.timeline.labels.map(()=>data.timeline.ev);
+            let acLine=data.timeline.labels.map(()=>data.timeline.ac);
+            chartInstances['chartTimeline']=new Chart(ctx,{
+                type:'line',data:{labels:data.timeline.labels,datasets:[
+                    {label:'PV (план)',data:data.timeline.pv,borderColor:'#58a6ff',fill:true},
+                    {label:'EV (освоено)',data:evLine,borderColor:'#56d364',borderDash:[6,3]},
+                    {label:'AC (факт)',data:acLine,borderColor:'#f0883e',borderDash:[6,3]}
+                ]},options:{responsive:true,plugins:{legend:{labels:{color:'#c9d1d9'}}},scales:{x:{ticks:{color:'#8b949e',maxTicksLimit:12}},y:{ticks:{color:'#8b949e'}}}}
+            });
+        }
+    }
+    destroyChart('chartProjCompletion');
+    let ctx2=document.getElementById('chartProjCompletion');
+    if(ctx2&&data.projects.length){
+        let labels2=data.projects.map(p=>p.project.replace('.xml','').substring(0,25));
+        chartInstances['chartProjCompletion']=new Chart(ctx2,{
+            type:'bar',data:{labels:labels2,datasets:[
+                {label:'Завершено',data:data.projects.map(p=>p.done),backgroundColor:'#238636'},
+                {label:'В работе',data:data.projects.map(p=>p.in_progress),backgroundColor:'#1f6feb'},
+                {label:'Не начато',data:data.projects.map(p=>p.not_started),backgroundColor:'#484f58'}
+            ]},options:{responsive:true,plugins:{legend:{labels:{color:'#c9d1d9'}}},scales:{x:{stacked:true,ticks:{color:'#8b949e',maxRotation:45}},y:{stacked:true,ticks:{color:'#8b949e'}}}}
+        });
+    }
+    if(data.overdue_dynamics&&data.overdue_dynamics.labels&&data.overdue_dynamics.labels.length){
+        destroyChart('chartOverdueDyn');
+        let ctx3=document.getElementById('chartOverdueDyn');
+        if(ctx3){
+            chartInstances['chartOverdueDyn']=new Chart(ctx3,{
+                type:'line',data:{labels:data.overdue_dynamics.labels,datasets:[{label:'Просроченных задач',data:data.overdue_dynamics.counts,borderColor:'#f85149',fill:true}]},
+                options:{responsive:true,plugins:{legend:{labels:{color:'#c9d1d9'}}},scales:{x:{ticks:{color:'#8b949e',maxTicksLimit:12}},y:{beginAtZero:true,ticks:{color:'#8b949e'}}}}
+            });
+        }
+    }
+    destroyChart('chartTopEV');
+    let ctx4=document.getElementById('chartTopEV');
+    if(ctx4&&data.resources.length){
+        let sorted=data.resources.slice().sort((a,b)=>b.ev-a.ev).slice(0,10);
+        chartInstances['chartTopEV']=new Chart(ctx4,{
+            type:'bar',data:{labels:sorted.map(r=>r.name.substring(0,20)),datasets:[{label:'EV (освоено)',data:sorted.map(r=>r.ev),backgroundColor:sorted.map(r=>r.status_color==='green'?'#238636':(r.status_color==='yellow'?'#9e6a03':'#da3633'))}]},
+            options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8b949e'}},y:{ticks:{color:'#c9d1d9'}}}}
+        });
+    }
+    if(data.heatmap) renderHeatmap(data.heatmap);
+}
+
+function renderHeatmap(hm){
+    let wrap=document.getElementById('heatmapArea');
+    if(!wrap||!hm.resources||!hm.projects) return;
+    let lookup={}, maxVal=1;
+    (hm.data||[]).forEach(d=>{let key=d.resource+'||'+d.project; lookup[key]=d.work; if(d.work>maxVal) maxVal=d.work;});
+    let h='<table class="heatmap-table"><thead><tr><th></th>';
+    hm.projects.forEach(p=>h+=`<th title="${esc(p)}">${esc(p.replace('.xml','').substring(0,15))}</th>`);
+    h+=`</tr></thead><tbody>`;
+    hm.resources.forEach(r=>{
+        h+=`<tr><th style="text-align:left">${esc(r.substring(0,22))}</th>`;
+        hm.projects.forEach(p=>{
+            let val=lookup[r+'||'+p]||0;
+            let intensity=val>0?Math.min(val/maxVal,1):0;
+            let bg=val>0?`rgba(88,166,255,${0.15+intensity*0.7})`:'transparent';
+            h+=`<td style="background:${bg}">${val>0?fmt(val):''}</td>`;
+        });
+        h+=`</tr>`;
+    });
+    h+=`</tbody></table>`;
+    wrap.innerHTML=h;
+}
+
+function renderCompare(data){
+    let html=`<div class="tab-bar"><div class="tab-btn active" onclick="switchTab('tabCmpProj',this)">📁 Проекты</div><div class="tab-btn" onclick="switchTab('tabCmpRes',this)">👤 Исполнители</div></div>`;
+    html+=`<div class="tab-content active" id="tabCmpProj"><div class="table-wrap"><table><thead><tr>
+        <th rowspan="2">Проект</th>
+        <th colspan="4" style="text-align:center">«Было» (${esc(data.cutoff1)})</th>
+        <th colspan="4" style="text-align:center">«Стало» (${esc(data.cutoff2)})</th>
+        <th colspan="5" style="text-align:center">Δ Изменение</th>
+    </tr><tr>
+        <th>✅</th><th>🔄</th><th>EV</th><th>Просрочки</th>
+        <th>✅</th><th>🔄</th><th>EV</th><th>Просрочки</th>
+        <th>Δ ✅</th><th>Δ EV</th><th>Δ Просрочки</th><th>Δ %</th><th>Δ Work, ч</th>
+    </tr></thead><tbody>`;
+    data.projects.forEach(p=>{
+        let b=p.before||{}, a=p.after||{}, d=p.delta||{};
+        html+=`<tr>
+            <td><b>${esc(p.project)}</b></td>
+            <td>${b.done||0}</td><td>${b.in_progress||0}</td><td style="text-align:right">${fmtMoney(b.ev)}</td><td>${b.overdue_count||0}</td>
+            <td>${a.done||0}</td><td>${a.in_progress||0}</td><td style="text-align:right">${fmtMoney(a.ev)}</td><td>${a.overdue_count||0}</td>
+            <td>${deltaHtml(d.done)}</td><td>${deltaHtml(d.ev)}</td><td>${deltaHtml(d.overdue_count,true)}</td><td>${deltaHtml(d.completion_pct)}</td>
+            <td>${deltaHtml(d.total_work)}</td>
+        </tr>`;
+    });
+    html+=`</tbody></table></div></div>`;
+    html+=`<div class="tab-content" id="tabCmpRes"><div class="table-wrap"><table><thead><tr>
+        <th rowspan="2">Исполнитель</th><th rowspan="2">Отдел</th>
+        <th colspan="3" style="text-align:center">«Было»</th>
+        <th colspan="3" style="text-align:center">«Стало»</th>
+        <th colspan="4" style="text-align:center">Δ</th>
+    </tr><tr>
+        <th>✅</th><th>EV</th><th>Просрочки</th>
+        <th>✅</th><th>EV</th><th>Просрочки</th>
+        <th>Δ ✅</th><th>Δ EV</th><th>Δ Просрочки</th><th>Δ Продуктивн.</th>
+    </tr></thead><tbody>`;
+    data.resources.forEach(r=>{
+        let b=r.before||{}, a=r.after||{}, d=r.delta||{};
+        html+=`<tr>
+            <td><b>${esc(r.resource)}</b></td><td>${esc(r.department)}</td>
+            <td>${b.done||0}</td><td style="text-align:right">${fmtMoney(b.ev)}</td><td>${b.overdue_count||0}</td>
+            <td>${a.done||0}</td><td style="text-align:right">${fmtMoney(a.ev)}</td><td>${a.overdue_count||0}</td>
+            <td>${deltaHtml(d.done)}</td><td>${deltaHtml(d.ev)}</td><td>${deltaHtml(d.overdue_count,true)}</td><td>${deltaHtml(d.productivity_index)}</td>
+        </tr>`;
+    });
+    html+=`</tbody></table></div></div>`;
+    document.getElementById('resultsArea').innerHTML=html;
+}
+
+function switchTab(tabId,btn){
+    let parent=btn.parentElement;
+    parent.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    let contentParent=parent.parentElement;
+    contentParent.querySelectorAll('.tab-content').forEach(tc=>tc.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+}
+function toggleOverdue(id){let el=document.getElementById(id);if(el)el.classList.toggle('open');}
+loadSnapshots();
+</script>
+</body>
+</html>
