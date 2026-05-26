@@ -13,9 +13,7 @@ from typing import Dict, List, Tuple, Optional, Any
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = BASE_DIR / "data"
-XML_DIR = DATA_DIR / "xml_data"
+from src.config import XML_DIR, DATA_DIR, BASE_DIR
 
 LOG_DIR = BASE_DIR / "logs"
 
@@ -537,5 +535,7 @@ def get_resource_work_map(tasks: List[Task]) -> Dict[str, Dict[str, float]]:
             res_map[res]["remaining_work"] += share_remaining
             res_map[res]["actual_work"] = res_map[res]["work"] - res_map[res]["remaining_work"]
     return res_map
+
+
 
 
