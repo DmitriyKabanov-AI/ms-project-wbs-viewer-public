@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import sys
 import os
@@ -7,10 +7,10 @@ import logging
 from pathlib import Path
 from datetime import datetime, timedelta
 from flask import Flask, render_template, jsonify, request
-
+from .config import LOG_DIR, NOTES_FILE, XML_DIR, SNAPSHOTS_DIR
 sys.path.insert(0, str(Path(__file__).parent))
 
-from src.config import LOG_DIR, NOTES_FILE, XML_DIR, SNAPSHOTS_DIR, DATA_DIR
+ 
 
 # Логирование
 LOG_DIR.mkdir(exist_ok=True)
@@ -25,7 +25,7 @@ log = logging.getLogger(__name__)
 # Импорт wbs_parser
 log.info("Импорт модуля wbs_parser...")
 try:
-    import src.wbs_parser as wbs_parser
+    from . import wbs_parser
     required_functions = [
         'get_projects_data_as_json',
         'task_status',
@@ -47,7 +47,7 @@ except Exception as e:
 # Импорт аналитики
 log.info("Импорт модуля analytics...")
 try:
-    from src.analytics import (
+    from .analytics import (
         list_snapshots,
         single_snapshot_analytics,
         compare_snapshots,
@@ -162,7 +162,7 @@ def api_resource_profile():
     snap_id = request.args.get('snapshot', 'current')
     start = request.args.get('start')
     end = request.args.get('end')
-    from src.analytics import load_snapshot
+    from .analytics import load_snapshot
     data = load_snapshot(snap_id)
     if "error" in data:
         return jsonify(data), 400

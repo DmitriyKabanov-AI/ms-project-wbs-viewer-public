@@ -3,26 +3,26 @@
 """
 Analytics Engine — "Before / After" analytics with Work, Critical, Milestone, RAG, forecast
 """
-
+import sys
 import logging
 from pathlib import Path
 from datetime import datetime, date, timedelta
-from typing import Dict, List, Any, Optional, Tuple
-from dataclasses import dataclass
-
+from typing import Dict, List, Any
+from ..config import XML_DIR, SNAPSHOTS_DIR, BASE_DIR
+from ..wbs_parser import (
+    parse_msproject_xml, build_wbs_tree, aggregate_costs,
+    get_departments_for_resources, Task
+    
+)
 log = logging.getLogger("analytics")
 
-from src.config import XML_DIR, SNAPSHOTS_DIR, BASE_DIR
+
 SNAPSHOTS_DIR.mkdir(exist_ok=True)
 
 # Import wbs_parser functions
-import sys
+
 sys.path.insert(0, str(BASE_DIR))
-from src.wbs_parser import (
-    parse_msproject_xml, build_wbs_tree, aggregate_costs,
-    task_status, task_status_label, get_departments_for_resources, Task,
-    get_resource_work_map
-)
+
 
 # ------------------------------------------------------------
 #  SNAPSHOTS LIST
@@ -280,12 +280,12 @@ def compute_weekly_timeline(all_tasks: List[Task], cutoff: date) -> Dict[str, An
         if t.start:
             try:
                 starts.append(datetime.strptime(t.start[:10], "%Y-%m-%d").date())
-            except:
+            except(ValueError, IndexError, KeyError, AttributeError):
                 pass
         if t.finish:
             try:
                 finishes.append(datetime.strptime(t.finish[:10], "%Y-%m-%d").date())
-            except:
+            except(ValueError, IndexError, KeyError, AttributeError):
                 pass
     if not starts or not finishes:
         return {"labels": [], "pv": [], "ev": 0, "ac": 0, "bac": 0}
@@ -360,7 +360,7 @@ def compute_overdue_dynamics(all_tasks: List[Task], cutoff: date) -> Dict[str, A
     for t in leaf:
         try:
             finishes.append(datetime.strptime(t.finish[:10], "%Y-%m-%d").date())
-        except:
+        except(ValueError, IndexError, KeyError, AttributeError):
             pass
     if not finishes:
         return {"labels": [], "counts": []}
@@ -378,7 +378,7 @@ def compute_overdue_dynamics(all_tasks: List[Task], cutoff: date) -> Dict[str, A
                 fd = datetime.strptime(t.finish[:10], "%Y-%m-%d").date()
                 if fd < current:
                     overdue_count += 1
-            except:
+            except(ValueError, IndexError, KeyError, AttributeError):
                 pass
         labels.append(current.strftime("%Y-%m-%d"))
         counts.append(overdue_count)
@@ -409,7 +409,7 @@ def compute_resource_work_profile(all_tasks: List[Task], start_date: date, end_d
         try:
             t_start = datetime.strptime(task.start[:10], "%Y-%m-%d").date()
             t_finish = datetime.strptime(task.finish[:10], "%Y-%m-%d").date()
-        except:
+        except(ValueError, IndexError, KeyError, AttributeError):
             continue
         
         if t_finish < start_date or t_start > end_date:
@@ -452,7 +452,7 @@ def compute_resource_work_profile(all_tasks: List[Task], start_date: date, end_d
 def single_snapshot_analytics(snap_id: str, cutoff_str: str) -> Dict[str, Any]:
     try:
         cutoff = datetime.strptime(cutoff_str, "%Y-%m-%d").date() if cutoff_str else date.today()
-    except:
+    except(ValueError, IndexError, KeyError, AttributeError):
         cutoff = date.today()
     data = load_snapshot(snap_id)
     if "error" in data:
@@ -495,11 +495,11 @@ def compare_snapshots(snap1: str, snap2: str,
                       cutoff1_str: str, cutoff2_str: str) -> Dict[str, Any]:
     try:
         c1 = datetime.strptime(cutoff1_str, "%Y-%m-%d").date() if cutoff1_str else date.today()
-    except:
+    except(ValueError, IndexError, KeyError, AttributeError):
         c1 = date.today()
     try:
         c2 = datetime.strptime(cutoff2_str, "%Y-%m-%d").date() if cutoff2_str else date.today()
-    except:
+    except(ValueError, IndexError, KeyError, AttributeError):
         c2 = date.today()
     d1 = load_snapshot(snap1)
     d2 = load_snapshot(snap2)

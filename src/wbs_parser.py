@@ -4,16 +4,13 @@
 WBS Parser + EVM (PMBOK) + Work + Assignments + Critical + Milestone
 """
 
-import sys
-import json
 import logging
 from pathlib import Path
 from xml.etree import ElementTree as ET
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Dict, List, Tuple, Any
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
 
-from src.config import XML_DIR, DATA_DIR, BASE_DIR
+from .config import XML_DIR, BASE_DIR
 
 LOG_DIR = BASE_DIR / "logs"
 
@@ -147,14 +144,18 @@ class Task:
 
 
 def task_status(pct: int) -> str:
-    if pct >= 100: return "done"
-    elif pct > 0: return "inprogress"
+    if pct >= 100: 
+        return "done"
+    elif pct > 0: 
+        return "inprogress"
     return "notstarted"
 
 
 def task_status_label(pct: int) -> str:
-    if pct >= 100: return "Завершена"
-    elif pct > 0: return "В работе"
+    if pct >= 100: 
+        return "Завершена"
+    elif pct > 0: 
+        return "В работе"
     return "Не начата"
 
 
@@ -176,7 +177,7 @@ def parse_duration_to_hours(dur_str: str) -> float:
             try:
                 days = float(dur_str[1:-1])
                 return days * 8.0
-            except:
+            except(ValueError, IndexError):
                 pass
     import re
     hours = 0.0
@@ -233,7 +234,7 @@ def parse_msproject_xml(xml_path: Path) -> Tuple[List[Task], Dict[str, str]]:
         if units_el is not None and units_el.text:
             try:
                 units = float(units_el.text) / 100.0
-            except:
+            except(ValueError, IndexError):
                 pass
         start = start_el.text[:10] if start_el is not None else ""
         finish = finish_el.text[:10] if finish_el is not None else ""
